@@ -1,7 +1,10 @@
 # ParkFlow – Smart Parking Manager
 
 > **Academic Data Structures & Algorithms Project (Python / Flask / PostgreSQL / Vercel)**  
-> A full-stack, responsive parking management web application utilizing a **Python Stack (LIFO: Last-In, First-Out)** data structure to allocate and release 20 parking bays.
+> A full-stack, responsive parking management web application utilizing a **Python Stack (LIFO: Last-In, First-Out)** data structure to allocate and release 20 parking bays.  
+>  
+> **Live Production URL:** [https://park-flow-nu.vercel.app](https://park-flow-nu.vercel.app)  
+> **GitHub Repository:** [https://github.com/Jeevith14/Park-Flow](https://github.com/Jeevith14/Park-Flow)
 
 ---
 
