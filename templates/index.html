@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ParkFlow – Smart Parking Manager | Python Stack (LIFO)</title>
+  <meta name="description" content="ParkFlow: Modern Parking Management System powered by Python Stack (LIFO) data structure and Flask backend.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+<div class="app-shell">
+  <!-- SIDEBAR NAVIGATION -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-logo">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+          <path d="M9 17V7h4a3 3 0 0 1 0 6H9"></path>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <span class="brand-name">ParkFlow</span>
+        <span class="brand-tag">Smart Parking Manager</span>
+      </div>
+    </div>
+
+    <nav class="nav-menu">
+      <button class="nav-link active" data-page="dashboard">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+        <span>Dashboard</span>
+      </button>
+
+      <button class="nav-link" data-page="park">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+        <span>Park Vehicle</span>
+      </button>
+
+      <button class="nav-link" data-page="slots">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+        <span>Parking Slots</span>
+      </button>
+
+      <button class="nav-link" data-page="vehicles">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+        <span>Vehicles</span>
+      </button>
+
+      <button class="nav-link" data-page="search">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <span>Search</span>
+      </button>
+
+      <button class="nav-link" data-page="history">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+        <span>History</span>
+      </button>
+
+      <button class="nav-link" data-page="stack">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5Z"></path><path d="m2 17 10 5 10-5"></path><path d="m2 12 10 5 10-5"></path></svg>
+        <span>Stack Operations</span>
+      </button>
+    </nav>
+
+    <!-- Sidebar Data Structure Footer -->
+    <div class="sidebar-footer">
+      <div class="ds-badge">
+        <div class="ds-icon">DS</div>
+        <div class="ds-info">
+          <strong>Python Stack</strong>
+          <span>LIFO Algorithm</span>
+        </div>
+      </div>
+      <div class="backend-badge">
+        <span class="pulse-dot"></span>
+        <span id="dbBadgeText">Flask + SQLite</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN VIEW CONTAINER -->
+  <main class="main-content">
+    <!-- TOPBAR -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="mobile-toggle-btn" id="mobileMenuBtn" aria-label="Toggle Menu">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+        </button>
+        <div class="breadcrumb">
+          <span>ParkFlow</span>
+          <span class="sep">/</span>
+          <strong id="breadcrumbCurrent">Dashboard</strong>
+        </div>
+      </div>
+
+      <div class="topbar-right">
+        <div class="live-status-pill">
+          <span class="status-indicator online"></span>
+          <span>System Online</span>
+        </div>
+        <button class="btn btn-outline-danger btn-sm" id="btnOpenReset" title="Reset system data">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
+          <span>Reset System</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- VIEWS CONTAINER -->
+    <div class="view-wrapper">
+
+      <!-- =================================================================== -->
+      <!-- PAGE: DASHBOARD -->
+      <!-- =================================================================== -->
+      <section class="page-view active" id="view-dashboard">
+        <!-- Hero Banner -->
+        <div class="hero-banner">
+          <div class="hero-content">
+            <span class="hero-badge">SMART PARKING MANAGEMENT SYSTEM</span>
+            <h1 class="hero-title">Real-Time Parking, <span class="highlight-text">Stack-Powered.</span></h1>
+            <p class="hero-desc">Automated slot allocation and release using a Python LIFO Stack data structure. 20 dedicated slots with instant turnarounds.</p>
+          </div>
+          <div class="hero-actions">
+            <button class="btn btn-primary btn-lg" onclick="navigateTo('park')">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              <span>Park Vehicle</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 4 KPI Statistic Cards -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon-wrapper icon-blue">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M9 17V7h4a3 3 0 0 1 0 6H9"></path></svg>
+            </div>
+            <div class="stat-details">
+              <span class="stat-label">Total Slots</span>
+              <strong class="stat-value" id="kpiTotalSlots">20</strong>
+              <span class="stat-sub">Fixed lot capacity</span>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon-wrapper icon-green">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </div>
+            <div class="stat-details">
+              <span class="stat-label">Available Slots</span>
+              <strong class="stat-value text-green" id="kpiAvailableSlots">20</strong>
+              <span class="stat-sub">Ready to allocate</span>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon-wrapper icon-red">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            </div>
+            <div class="stat-details">
+              <span class="stat-label">Occupied Slots</span>
+              <strong class="stat-value text-red" id="kpiOccupiedSlots">0</strong>
+              <span class="stat-sub">Vehicles currently parked</span>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon-wrapper icon-teal">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg>
+            </div>
+            <div class="stat-details">
+              <span class="stat-label">Occupancy Rate</span>
+              <strong class="stat-value text-teal" id="kpiUtilization">0%</strong>
+              <span class="stat-sub">Real-time utilization</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2-Column Section: Live Mini Map & Stack Peek Card -->
+        <div class="dashboard-grid">
+          <!-- Parking Map Card -->
+          <div class="card card-slots-overview">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title">Live Parking Map</h2>
+                <p class="card-subtitle">Real-time occupancy status across all 20 bays</p>
+              </div>
+              <div class="slot-legend">
+                <span class="legend-item"><span class="legend-dot available"></span> Available (Green)</span>
+                <span class="legend-item"><span class="legend-dot occupied"></span> Occupied (Red)</span>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="slots-grid mini" id="dashSlotsGrid">
+                <!-- Dynamically populated -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Stack Status Card -->
+          <div class="card card-stack-preview">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title">Stack Status</h2>
+                <p class="card-subtitle">LIFO slot allocation pointer</p>
+              </div>
+              <span class="badge badge-primary">LIFO</span>
+            </div>
+            <div class="card-body">
+              <div class="stack-hero-box">
+                <span class="stack-hero-label">NEXT SLOT TO BE ALLOCATED</span>
+                <strong class="stack-hero-slot" id="dashNextSlot">1</strong>
+                <span class="stack-hero-caption">Returned by <code class="code-tag">peek()</code></span>
+              </div>
+
+              <div class="stack-progress-wrap">
+                <div class="stack-progress-labels">
+                  <span>Stack Capacity</span>
+                  <span id="dashStackRatio">20 / 20 Slots</span>
+                </div>
+                <div class="progress-bar-bg">
+                  <div class="progress-bar-fill" id="dashStackBar" style="width: 100%;"></div>
+                </div>
+              </div>
+
+              <div class="stack-quick-note">
+                <div class="note-icon">💡</div>
+                <div class="note-text">
+                  <strong>Stack Principle:</strong> When a vehicle leaves, its freed slot is <strong>pushed</strong> back to the TOP. The next incoming vehicle receives that slot first via <strong>pop()</strong>.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Currently Parked Vehicles Table -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Currently Parked Vehicles</h2>
+              <p class="card-subtitle">Active vehicles parked in the bays</p>
+            </div>
+            <button class="btn btn-ghost" onclick="navigateTo('vehicles')">View All Vehicles →</button>
+          </div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Slot #</th>
+                    <th>Vehicle Number</th>
+                    <th>Owner Name</th>
+                    <th>Vehicle Type</th>
+                    <th>Entry Time</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="dashVehiclesTableBody">
+                  <!-- Dynamically populated -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- PAGE: PARK VEHICLE -->
+      <!-- =================================================================== -->
+      <section class="page-view" id="view-park">
+        <div class="page-header">
+          <div>
+            <span class="page-eyebrow">VEHICLE INTAKE</span>
+            <h1 class="page-title">Park a Vehicle</h1>
+            <p class="page-subtitle">Enter vehicle information to allocate the next available slot from the Python Stack.</p>
+          </div>
+        </div>
+
+        <div class="form-layout-grid">
+          <!-- Form Card -->
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">Vehicle Registration</h2>
+            </div>
+            <div class="card-body">
+              <form id="parkVehicleForm" onsubmit="handleParkSubmit(event)">
+                <div class="form-group">
+                  <label for="inputVehicleNo" class="form-label">Vehicle Registration Number *</label>
+                  <input type="text" id="inputVehicleNo" class="form-control" placeholder="e.g. KA 01 AB 1234 or DL 05 CD 9999" required autocomplete="off" autocapitalize="characters">
+                  <span class="form-hint">Plate numbers are automatically capitalized and formatted.</span>
+                </div>
+
+                <div class="form-group">
+                  <label for="inputOwnerName" class="form-label">Owner Full Name *</label>
+                  <input type="text" id="inputOwnerName" class="form-control" placeholder="e.g. Jeevith Kumar" required autocomplete="off">
+                </div>
+
+                <div class="form-group">
+                  <label for="selectVehicleType" class="form-label">Vehicle Type</label>
+                  <select id="selectVehicleType" class="form-control form-select">
+                    <option value="Car">Car</option>
+                    <option value="Bike">Bike / Motorcycle</option>
+                    <option value="SUV">SUV</option>
+                    <option value="Van">Van</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
+                <div class="alert-box d-none" id="parkFormAlert"></div>
+
+                <div class="form-actions">
+                  <button type="submit" class="btn btn-primary btn-block" id="btnSubmitPark">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    <span>Allocate Slot & Park Vehicle</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- Algorithm Explanation Card -->
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">Stack Allocation Mechanism</h2>
+              <span class="badge badge-teal">O(1) Time</span>
+            </div>
+            <div class="card-body">
+              <div class="next-allocation-card">
+                <div class="next-allocation-label">NEXT ASSIGNABLE SLOT</div>
+                <div class="next-allocation-value" id="parkNextSlotValue">Slot 1</div>
+                <div class="next-allocation-sub">Obtained via <code class="code-tag">stack.peek()</code></div>
+              </div>
+
+              <div class="algorithm-steps">
+                <div class="algo-step">
+                  <div class="step-num">1</div>
+                  <div class="step-text">
+                    <strong>Check Capacity:</strong>
+                    <span>Call <code class="code-tag">stack.is_empty()</code>. If True, throw parking lot full alert.</span>
+                  </div>
+                </div>
+
+                <div class="algo-step">
+                  <div class="step-num">2</div>
+                  <div class="step-text">
+                    <strong>Pop Top Slot:</strong>
+                    <span>Execute <code class="code-tag">slot = stack.pop()</code> in Python. O(1) removal of the top available bay.</span>
+                  </div>
+                </div>
+
+                <div class="algo-step">
+                  <div class="step-num">3</div>
+                  <div class="step-text">
+                    <strong>Persist & Confirm:</strong>
+                    <span>Record vehicle metadata in the database and mark Slot as Occupied (Red).</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- PAGE: PARKING SLOTS (MAP) -->
+      <!-- =================================================================== -->
+      <section class="page-view" id="view-slots">
+        <div class="page-header">
+          <div>
+            <span class="page-eyebrow">LIVE PARKING MATRIX</span>
+            <h1 class="page-title">Parking Slots Layout</h1>
+            <p class="page-subtitle">Complete 20-bay parking map. Green slots are free; Red slots are occupied.</p>
+          </div>
+          <div class="slot-legend">
+            <span class="legend-item"><span class="legend-dot available"></span> Available (Green)</span>
+            <span class="legend-item"><span class="legend-dot occupied"></span> Occupied (Red)</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-body">
+            <div class="slots-grid large" id="fullSlotsGrid">
+              <!-- Dynamically populated 20 slots -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- PAGE: ACTIVE VEHICLES -->
+      <!-- =================================================================== -->
+      <section class="page-view" id="view-vehicles">
+        <div class="page-header">
+          <div>
+            <span class="page-eyebrow">ACTIVE FLEET</span>
+            <h1 class="page-title">Parked Vehicles</h1>
+            <p class="page-subtitle">Monitor parked vehicles, inspect parking times, and process departures.</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header flex-between">
+            <div class="search-input-wrapper">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <input type="text" id="filterVehiclesInput" class="form-control" placeholder="Filter by plate or owner..." oninput="filterActiveVehicles()">
+            </div>
+            <span class="badge badge-blue" id="activeVehiclesCountBadge">0 Parked</span>
+          </div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Slot #</th>
+                    <th>Vehicle Plate</th>
+                    <th>Owner Name</th>
+                    <th>Vehicle Type</th>
+                    <th>Entry Timestamp</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="allActiveVehiclesTableBody">
+                  <!-- Dynamically populated -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- PAGE: SEARCH -->
+      <!-- =================================================================== -->
+      <section class="page-view" id="view-search">
+        <div class="page-header">
+          <div>
+            <span class="page-eyebrow">LOOKUP & AUDIT</span>
+            <h1 class="page-title">Vehicle Search</h1>
+            <p class="page-subtitle">Search both active and historical vehicle records by registration plate or owner name.</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-body">
+            <div class="search-hero-box">
+              <div class="search-input-group">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input type="text" id="globalSearchInput" class="form-control form-control-lg" placeholder="Type vehicle plate (e.g. KA01AB1234) or owner name..." oninput="debounceSearch()">
+                <button class="btn btn-primary" onclick="performSearch()">Search</button>
+              </div>
+            </div>
+
+            <div class="search-results-wrapper mt-4">
+              <h3 class="results-heading" id="searchResultsHeading">Search Results</h3>
+              <div class="table-responsive">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Status</th>
+                      <th>Slot #</th>
+                      <th>Vehicle Plate</th>
+                      <th>Owner Name</th>
+                      <th>Type</th>
+                      <th>Entry Time</th>
+                      <th>Exit Time</th>
+                      <th>Duration</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="searchResultsTableBody">
+                    <tr><td colspan="9" class="empty-state">Enter a search keyword to find vehicle records.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- PAGE: HISTORY -->
+      <!-- =================================================================== -->
+      <section class="page-view" id="view-history">
+        <div class="page-header">
+          <div>
+            <span class="page-eyebrow">AUDIT LOGS</span>
+            <h1 class="page-title">Parking History</h1>
+            <p class="page-subtitle">Full transaction log of vehicle entries, exits, and parking durations.</p>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="fetchHistory()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+            <span>Refresh History</span>
+          </button>
+        </div>
+
+        <div class="card">
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Log ID</th>
+                    <th>Status</th>
+                    <th>Slot #</th>
+                    <th>Vehicle Plate</th>
+                    <th>Owner Name</th>
+                    <th>Type</th>
+                    <th>Entry Time</th>
+                    <th>Exit Time</th>
+                    <th>Duration</th>
+                  </tr>
+                </thead>
+                <tbody id="historyTableBody">
+                  <!-- Dynamically populated -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- PAGE: STACK OPERATIONS (VIVA GUIDE) -->
+      <!-- =================================================================== -->
+      <section class="page-view" id="view-stack">
+        <div class="page-header">
+          <div>
+            <span class="page-eyebrow">ACADEMIC DATA STRUCTURE</span>
+            <h1 class="page-title">Python Stack (LIFO) Demonstration</h1>
+            <p class="page-subtitle">Visual representation and viva preparation guide for the Stack data structure used in ParkFlow.</p>
+          </div>
+        </div>
+
+        <div class="stack-view-grid">
+          <!-- Stack Visual Column -->
+          <div class="card">
+            <div class="card-header flex-between">
+              <div>
+                <h2 class="card-title">Live Stack Elements</h2>
+                <p class="card-subtitle">Slots available for allocation (Top is next to pop)</p>
+              </div>
+              <span class="badge badge-teal" id="stackCountBadge">20 Slots Available</span>
+            </div>
+            <div class="card-body">
+              <div class="stack-visual-container" id="stackVisualDisplay">
+                <!-- Stack elements rendered dynamically -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Academic Viva Q&A / Operations Cards -->
+          <div class="stack-edu-column">
+            <!-- Operations Card -->
+            <div class="card">
+              <div class="card-header">
+                <h2 class="card-title">Core Stack Operations</h2>
+              </div>
+              <div class="card-body">
+                <div class="op-item">
+                  <div class="op-header">
+                    <span class="op-name">push(slot)</span>
+                    <span class="op-complexity">O(1)</span>
+                  </div>
+                  <p class="op-desc">Adds a freed slot back to the <strong>TOP</strong> of the stack when a vehicle departs.</p>
+                </div>
+
+                <div class="op-item">
+                  <div class="op-header">
+                    <span class="op-name">pop()</span>
+                    <span class="op-complexity">O(1)</span>
+                  </div>
+                  <p class="op-desc">Removes and allocates the <strong>TOP</strong> available slot to the incoming vehicle.</p>
+                </div>
+
+                <div class="op-item">
+                  <div class="op-header">
+                    <span class="op-name">peek()</span>
+                    <span class="op-complexity">O(1)</span>
+                  </div>
+                  <p class="op-desc">Inspects the next slot to be allocated without removing it from the stack.</p>
+                </div>
+
+                <div class="op-item">
+                  <div class="op-header">
+                    <span class="op-name">is_empty()</span>
+                    <span class="op-complexity">O(1)</span>
+                  </div>
+                  <p class="op-desc">Returns True when all 20 slots are occupied (prevents stack underflow).</p>
+                </div>
+
+                <div class="op-item">
+                  <div class="op-header">
+                    <span class="op-name">size()</span>
+                    <span class="op-complexity">O(1)</span>
+                  </div>
+                  <p class="op-desc">Returns the current number of available slots in the stack.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- College Viva Cheat Sheet Card -->
+            <div class="card">
+              <div class="card-header">
+                <h2 class="card-title">Viva Preparation Guide</h2>
+              </div>
+              <div class="card-body">
+                <div class="viva-qa">
+                  <strong>Q: Why use a Stack instead of a Queue for parking?</strong>
+                  <p>In real-world parking lots, when a slot near the front entrance is vacated, directing the very next car into that recently vacated slot minimizes searching time and optimizes flow. This follows LIFO (Last-Freed, First-Allocated).</p>
+                </div>
+
+                <div class="viva-qa">
+                  <strong>Q: How does Python implement this stack?</strong>
+                  <p>Using a Python <code>list</code> with <code>list.append()</code> for <code>push()</code> and <code>list.pop()</code> for <code>pop()</code>, guaranteeing amortized $\mathcal{O}(1)$ time complexity for both operations.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<!-- =================================================================== -->
+<!-- MODALS -->
+<!-- =================================================================== -->
+
+<!-- Vehicle Exit Modal -->
+<div class="modal-backdrop" id="exitModalBackdrop">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h3 class="modal-title">Confirm Vehicle Exit</h3>
+      <button class="modal-close-btn" onclick="closeExitModal()">&times;</button>
+    </div>
+    <div class="modal-body" id="exitModalBody">
+      <p>Are you sure you want to process the exit for vehicle <strong id="exitVehiclePlate"></strong> from <strong id="exitSlotNumber"></strong>?</p>
+      <div class="exit-summary-box">
+        <div class="summary-row">
+          <span>Owner Name:</span>
+          <strong id="exitOwnerName">-</strong>
+        </div>
+        <div class="summary-row">
+          <span>Entry Time:</span>
+          <strong id="exitEntryTime">-</strong>
+        </div>
+        <div class="summary-row">
+          <span>Stack Action:</span>
+          <span class="text-teal font-mono">push(slot) → Return to TOP</span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeExitModal()">Cancel</button>
+      <button class="btn btn-danger" id="btnConfirmExit" onclick="submitExit()">Confirm Departure</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reset Confirmation Modal -->
+<div class="modal-backdrop" id="resetModalBackdrop">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h3 class="modal-title text-danger">Reset Parking System?</h3>
+      <button class="modal-close-btn" onclick="closeResetModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p>This action will release all 20 parking slots, mark active vehicles as exited, and reset the <strong>Python Stack</strong> to all 20 slots available.</p>
+      <div class="alert-box alert-warning">
+        ⚠️ This action cannot be undone. Are you sure you wish to proceed?
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeResetModal()">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmResetSystem()">Yes, Reset System</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST NOTIFICATION CONTAINER -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- APPLICATION JAVASCRIPT -->
+<script src="/static/js/app.js"></script>
+</body>
+</html>
