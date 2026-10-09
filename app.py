@@ -41,19 +41,16 @@ class VercelPathFixMiddleware:
         self.wsgi_app = wsgi_app
 
     def __call__(self, environ, start_response):
-        path = environ.get("PATH_INFO", "")
-        # 1. If Vercel provided x-matched-path, use it as real client path
-        matched = environ.get("HTTP_X_MATCHED_PATH")
-        if matched:
-            environ["PATH_INFO"] = matched.split("?")[0]
-        # 2. If PATH_INFO is the Vercel function entrypoint, map to root
-        elif path in ("/api/index.py", "/api/index", "/api", "/api/"):
-            environ["PATH_INFO"] = "/"
-        # 3. If PATH_INFO is prefixed by /api/index.py/..., strip it
-        elif path.startswith("/api/index.py/"):
-            environ["PATH_INFO"] = path[len("/api/index.py"):]
-        elif path.startswith("/api/index/"):
-            environ["PATH_INFO"] = path[len("/api/index"):]
+        # On Vercel, RAW_URI or REQUEST_URI preserves the client's actual requested path
+        raw_uri = environ.get("RAW_URI") or environ.get("REQUEST_URI")
+        if raw_uri:
+            environ["PATH_INFO"] = raw_uri.split("?")[0]
+        else:
+            path = environ.get("PATH_INFO", "")
+            if path in ("/api/index.py", "/api/index", "/api", "/api/"):
+                environ["PATH_INFO"] = "/"
+            elif path.startswith("/api/index.py/"):
+                environ["PATH_INFO"] = path[len("/api/index.py"):]
 
         return self.wsgi_app(environ, start_response)
 
@@ -65,10 +62,10 @@ app.wsgi_app = VercelPathFixMiddleware(app.wsgi_app)
 # =============================================================================
 
 @app.route("/")
-@app.route("/api/index")
-@app.route("/api/index.py")
 def index():
     """Render the main ParkFlow Single-Page Application interface."""
+    if request.args.get("debug") == "1":
+        return jsonify({k: str(v) for k, v in request.environ.items() if isinstance(v, (str, int))})
     try:
         return render_template("index.html")
     except Exception as e:
