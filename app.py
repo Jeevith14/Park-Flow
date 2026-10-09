@@ -28,18 +28,54 @@ app = Flask(
 )
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "parkflow-smart-parking-secret-key-2026")
 
-# Initialize database tables and initial stack state
-database.init_db()
+# Safe initialization of database tables and initial stack state
+try:
+    database.init_db()
+except Exception as e:
+    print(f"[Warning] Startup init_db bypassed: {e}")
 
 
 # =============================================================================
-# WEB VIEWS
+# WEB VIEWS & STATIC ASSET HANDLERS
 # =============================================================================
 
 @app.route("/")
 def index():
     """Render the main ParkFlow Single-Page Application interface."""
-    return render_template("index.html")
+    try:
+        return render_template("index.html")
+    except Exception as e:
+        # Fallback to direct HTML file read if template engine encounters bundle path issues
+        for possible_path in [
+            os.path.join(BASE_DIR, "templates", "index.html"),
+            os.path.join(os.getcwd(), "templates", "index.html"),
+            os.path.join("/var/task", "templates", "index.html")
+        ]:
+            if os.path.exists(possible_path):
+                try:
+                    with open(possible_path, "r", encoding="utf-8") as f:
+                        return f.read(), 200, {"Content-Type": "text/html; charset=utf-8"}
+                except Exception:
+                    pass
+        return f"ParkFlow Backend Running. Template error: {e}", 500
+
+
+@app.route("/static/<path:filename>")
+def custom_static(filename):
+    """Ensure static assets are always found in serverless environments."""
+    for folder in [
+        os.path.join(BASE_DIR, "static"),
+        os.path.join(os.getcwd(), "static"),
+        os.path.join("/var/task", "static")
+    ]:
+        target = os.path.join(folder, filename)
+        if os.path.exists(target):
+            return send_from_directory(folder, filename)
+    return jsonify({"error": f"Static file {filename} not found"}), 404
+
+
+# Vercel handler export
+handler = app
 
 
 # =============================================================================

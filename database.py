@@ -5,20 +5,23 @@ PARKFLOW DATABASE ADAPTER (database.py)
 Academic Topic: Dual-Engine Database Persistence for Serverless Deployment
 Engines Supported:
 1. Neon PostgreSQL / Vercel Postgres (when DATABASE_URL is set in environment)
-2. SQLite (local zero-configuration fallback: parkflow.db)
+2. SQLite (local & serverless /tmp fallback: parkflow.db)
 
 Key Design:
 - Serverless-Ready: In serverless environments (like Vercel), function memory
   is ephemeral. All stack operations and vehicle allocations are committed
   transactionally to persistent storage.
-- Parameter Normalization: Automatically adapts query placeholders (? for SQLite,
-  %s for PostgreSQL).
+- Read-Only Filesystem Safe: Automatically detects Vercel / AWS Lambda environment
+  and uses /tmp/parkflow.db to prevent read-only filesystem crash.
+- URL Parser & Pure-Python Driver: Uses pg8000 (pure Python) first to ensure
+  100% binary compatibility on Linux serverless containers without requiring libpq.
 =============================================================================
 """
 
 import os
 import sys
 import sqlite3
+import urllib.parse
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Tuple
 
@@ -27,54 +30,82 @@ TOTAL_SLOTS = 20
 # Detect Database URL from environment
 DATABASE_URL = os.environ.get("DATABASE_URL") or os.environ.get("POSTGRES_URL")
 
-# Resolve safe SQLite path
+# Base directory
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-SQLITE_DB_PATH = os.path.join(BASE_DIR, "parkflow.db")
 
-# Flag for active database engine
+# Serverless-safe SQLite path:
+# AWS Lambda / Vercel functions have a read-only root filesystem.
+# Only /tmp is writable.
+if os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME") or not os.access(BASE_DIR, os.W_OK):
+    SQLITE_DB_PATH = "/tmp/parkflow.db"
+else:
+    SQLITE_DB_PATH = os.path.join(BASE_DIR, "parkflow.db")
+
 IS_POSTGRES = False
 
-if DATABASE_URL and (DATABASE_URL.startswith("postgres://") or DATABASE_URL.startswith("postgresql://")):
-    # Normalise postgres:// scheme to postgresql:// for compatibility
-    if DATABASE_URL.startswith("postgres://"):
-        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-    IS_POSTGRES = True
+
+def connect_postgres(url: str):
+    """
+    Connect to PostgreSQL using pg8000 (pure Python) or psycopg2.
+    Safely parses URL and strips query parameters from database name.
+    """
+    parsed = urllib.parse.urlsplit(url)
+    user = urllib.parse.unquote(parsed.username) if parsed.username else ""
+    password = urllib.parse.unquote(parsed.password) if parsed.password else ""
+    host = parsed.hostname
+    port = parsed.port or 5432
+    # Ensure database name does not contain query string
+    database_name = parsed.path.lstrip("/").split("?")[0] if parsed.path else "neondb"
+
+    # 1. Try pg8000 first (pure Python, zero C dependencies, works in any serverless container)
+    try:
+        import pg8000.dbapi
+        import ssl
+        ssl_ctx = ssl.create_default_context()
+        ssl_ctx.check_hostname = False
+        ssl_ctx.verify_mode = ssl.CERT_NONE
+
+        conn = pg8000.dbapi.connect(
+            user=user,
+            password=password,
+            host=host,
+            port=port,
+            database=database_name,
+            ssl_context=ssl_ctx
+        )
+        return conn, "postgres"
+    except Exception as e_pg8000:
+        # 2. Try psycopg2 as fallback
+        try:
+            import psycopg2
+            # Normalise scheme
+            norm_url = url
+            if norm_url.startswith("postgres://"):
+                norm_url = norm_url.replace("postgres://", "postgresql://", 1)
+            conn = psycopg2.connect(norm_url)
+            return conn, "postgres"
+        except Exception as e_psycopg2:
+            raise Exception(f"PostgreSQL connection failed: pg8000: {e_pg8000}; psycopg2: {e_psycopg2}")
 
 
 def get_connection():
     """
     Establish and return a database connection.
-    Falls back to SQLite if PostgreSQL is unavailable or unconfigured.
+    Attempts PostgreSQL if DATABASE_URL is present, otherwise safely falls back to SQLite.
     """
     global IS_POSTGRES
-    if IS_POSTGRES and DATABASE_URL:
+    if DATABASE_URL and ("postgres" in DATABASE_URL.lower()):
         try:
-            import psycopg2
-            import psycopg2.extras
-            conn = psycopg2.connect(DATABASE_URL)
+            conn, engine = connect_postgres(DATABASE_URL)
+            IS_POSTGRES = True
             return conn, "postgres"
         except Exception as e:
-            # Fallback to pg8000 if psycopg2 fails
-            try:
-                import pg8000.dbapi
-                import urllib.parse
-                parsed = urllib.parse.urlparse(DATABASE_URL)
-                conn = pg8000.dbapi.connect(
-                    user=parsed.username,
-                    password=parsed.password,
-                    host=parsed.hostname,
-                    port=parsed.port or 5432,
-                    database=parsed.path.lstrip("/"),
-                    ssl_context=True
-                )
-                return conn, "postgres"
-            except Exception as e2:
-                print(f"[Warning] Failed to connect to PostgreSQL ({e}, {e2}). Falling back to local SQLite.")
-                # Fallback to SQLite
-                pass
+            print(f"[Warning] Failed to connect to PostgreSQL ({e}). Falling back to SQLite at {SQLITE_DB_PATH}.")
+            IS_POSTGRES = False
 
     conn = sqlite3.connect(SQLITE_DB_PATH)
     conn.row_factory = sqlite3.Row
+    IS_POSTGRES = False
     return conn, "sqlite"
 
 
@@ -129,109 +160,109 @@ def execute_query(query: str, params: tuple = (), fetch_one: bool = False, fetch
 def init_db():
     """
     Initialize database schema and seed empty slots + full parking stack.
+    Safe against exceptions to prevent crashing the serverless worker.
     """
-    conn, engine = get_connection()
-    cur = conn.cursor()
+    try:
+        conn, engine = get_connection()
+        cur = conn.cursor()
 
-    if engine == "postgres":
-        # PostgreSQL schema
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS parking_slots (
-                slot_number INT PRIMARY KEY,
-                is_occupied BOOLEAN DEFAULT FALSE,
-                vehicle_no VARCHAR(50),
-                owner_name VARCHAR(100),
-                vehicle_type VARCHAR(50),
-                parked_at TIMESTAMP
-            );
-        """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS stack_items (
-                position INT PRIMARY KEY,
-                slot_number INT NOT NULL
-            );
-        """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS vehicle_history (
-                id SERIAL PRIMARY KEY,
-                vehicle_no VARCHAR(50) NOT NULL,
-                owner_name VARCHAR(100) NOT NULL,
-                vehicle_type VARCHAR(50) NOT NULL,
-                slot_number INT NOT NULL,
-                entry_time TIMESTAMP NOT NULL,
-                exit_time TIMESTAMP,
-                duration_minutes INT,
-                status VARCHAR(20) NOT NULL
-            );
-        """)
-    else:
-        # SQLite schema
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS parking_slots (
-                slot_number INTEGER PRIMARY KEY,
-                is_occupied INTEGER DEFAULT 0,
-                vehicle_no TEXT,
-                owner_name TEXT,
-                vehicle_type TEXT,
-                parked_at TEXT
-            );
-        """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS stack_items (
-                position INTEGER PRIMARY KEY,
-                slot_number INTEGER NOT NULL
-            );
-        """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS vehicle_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                vehicle_no TEXT NOT NULL,
-                owner_name TEXT NOT NULL,
-                vehicle_type TEXT NOT NULL,
-                slot_number INTEGER NOT NULL,
-                entry_time TEXT NOT NULL,
-                exit_time TEXT,
-                duration_minutes INTEGER,
-                status TEXT NOT NULL
-            );
-        """)
+        if engine == "postgres":
+            # PostgreSQL schema
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS parking_slots (
+                    slot_number INT PRIMARY KEY,
+                    is_occupied BOOLEAN DEFAULT FALSE,
+                    vehicle_no VARCHAR(50),
+                    owner_name VARCHAR(100),
+                    vehicle_type VARCHAR(50),
+                    parked_at TIMESTAMP
+                );
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS stack_items (
+                    position INT PRIMARY KEY,
+                    slot_number INT NOT NULL
+                );
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS vehicle_history (
+                    id SERIAL PRIMARY KEY,
+                    vehicle_no VARCHAR(50) NOT NULL,
+                    owner_name VARCHAR(100) NOT NULL,
+                    vehicle_type VARCHAR(50) NOT NULL,
+                    slot_number INT NOT NULL,
+                    entry_time TIMESTAMP NOT NULL,
+                    exit_time TIMESTAMP,
+                    duration_minutes INT,
+                    status VARCHAR(20) NOT NULL
+                );
+            """)
+        else:
+            # SQLite schema
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS parking_slots (
+                    slot_number INTEGER PRIMARY KEY,
+                    is_occupied INTEGER DEFAULT 0,
+                    vehicle_no TEXT,
+                    owner_name TEXT,
+                    vehicle_type TEXT,
+                    parked_at TEXT
+                );
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS stack_items (
+                    position INTEGER PRIMARY KEY,
+                    slot_number INTEGER NOT NULL
+                );
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS vehicle_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    vehicle_no TEXT NOT NULL,
+                    owner_name TEXT NOT NULL,
+                    vehicle_type TEXT NOT NULL,
+                    slot_number INTEGER NOT NULL,
+                    entry_time TEXT NOT NULL,
+                    exit_time TEXT,
+                    duration_minutes INTEGER,
+                    status TEXT NOT NULL
+                );
+            """)
 
-    conn.commit()
-
-    # Check if slots are seeded
-    cur.execute("SELECT COUNT(*) FROM parking_slots")
-    slot_count = cur.fetchone()[0]
-
-    if slot_count == 0:
-        # Seed 20 slots
-        for i in range(1, TOTAL_SLOTS + 1):
-            if engine == "postgres":
-                cur.execute("INSERT INTO parking_slots (slot_number, is_occupied) VALUES (%s, FALSE)", (i,))
-            else:
-                cur.execute("INSERT INTO parking_slots (slot_number, is_occupied) VALUES (?, 0)", (i,))
         conn.commit()
 
-    # Check if stack is seeded
-    cur.execute("SELECT COUNT(*) FROM stack_items")
-    stack_count = cur.fetchone()[0]
+        # Check if slots are seeded
+        cur.execute("SELECT COUNT(*) FROM parking_slots")
+        slot_count = cur.fetchone()[0]
 
-    # If slot table is fresh or stack is empty with 0 parked vehicles, seed full stack
-    cur.execute("SELECT COUNT(*) FROM parking_slots WHERE is_occupied = TRUE OR is_occupied = 1")
-    occupied_count = cur.fetchone()[0]
+        if slot_count == 0:
+            for i in range(1, TOTAL_SLOTS + 1):
+                if engine == "postgres":
+                    cur.execute("INSERT INTO parking_slots (slot_number, is_occupied) VALUES (%s, FALSE)", (i,))
+                else:
+                    cur.execute("INSERT INTO parking_slots (slot_number, is_occupied) VALUES (?, 0)", (i,))
+            conn.commit()
 
-    if stack_count == 0 and occupied_count == 0:
-        # Seed stack items: [20, 19, ..., 2, 1]
-        # Position 0 is bottom (20), Position 19 is top (1)
-        slots_desc = list(range(TOTAL_SLOTS, 0, -1))
-        for pos, slot_no in enumerate(slots_desc):
-            if engine == "postgres":
-                cur.execute("INSERT INTO stack_items (position, slot_number) VALUES (%s, %s)", (pos, slot_no))
-            else:
-                cur.execute("INSERT INTO stack_items (position, slot_number) VALUES (?, ?)", (pos, slot_no))
-        conn.commit()
+        # Check if stack is seeded
+        cur.execute("SELECT COUNT(*) FROM stack_items")
+        stack_count = cur.fetchone()[0]
 
-    cur.close()
-    conn.close()
+        cur.execute("SELECT COUNT(*) FROM parking_slots WHERE is_occupied = TRUE OR is_occupied = 1")
+        occupied_count = cur.fetchone()[0]
+
+        if stack_count == 0 and occupied_count == 0:
+            slots_desc = list(range(TOTAL_SLOTS, 0, -1))
+            for pos, slot_no in enumerate(slots_desc):
+                if engine == "postgres":
+                    cur.execute("INSERT INTO stack_items (position, slot_number) VALUES (%s, %s)", (pos, slot_no))
+                else:
+                    cur.execute("INSERT INTO stack_items (position, slot_number) VALUES (?, ?)", (pos, slot_no))
+            conn.commit()
+
+        cur.close()
+        conn.close()
+    except Exception as e:
+        print(f"[Warning] init_db encountered an issue: {e}")
 
 
 def get_stack_slots() -> List[int]:
@@ -313,7 +344,6 @@ def park_vehicle_in_db(vehicle_no: str, owner_name: str, vehicle_type: str, slot
     conn, engine = get_connection()
     cur = conn.cursor()
     
-    # 1. Update parking slot
     if engine == "postgres":
         cur.execute("""
             UPDATE parking_slots 
